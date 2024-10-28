@@ -8,7 +8,7 @@ object_name = 'my_s3_object.txt'
 
 # Replace <DOCUMENT_BUCKET> with your DocumentBucketName value listed to the left of these instructions (keep the quotes)
 
-bucket_name = 'INSERT_DOCUMENT_BUCKET' 
+bucket_name = 'arn:aws:s3:documentbucket-150257624292:' 
 s3_client = boto3.client('s3')
 
 response = s3_client.upload_file(file_name, bucket_name, object_name)
