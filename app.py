@@ -1,14 +1,20 @@
 "Lambda function to process license, zip and selfie zip files"
+# Environment variables:
+# TABLE = CustomerMetaDataTable
 
 import json
 import os
+import csv
 import zipfile
 import boto3
 
 unzipped_dir = "/tmp/unzipped/"
 unzipped_s3_prefix = "unzipped/"
+env_table = os.environ['TABLE']
 
 s3 = boto3.client('s3')
+dynamodb = boto3.resource('dynamodb')
+ddb_table = dynamodb.Table(env_table)
 
 def unzip_object(bucket, key):
     """Download .zip file, extract, return bucket name, object names, app_uuid,
@@ -23,6 +29,16 @@ def unzip_object(bucket, key):
     zipped_files = os.listdir(unzipped_dir)
     return zipped_files
 
+def parse_csv_ddb(app_uuid, details_file):
+    "Load CSV and save to dynamo"
+    with open(details_file, 'r', encoding="utf-8") as file:
+        reader = csv.DictReader(file)
+        details_dict = next(reader)
+
+    ddb_table.put_item(Item={**details_dict, "APP_UUID": app_uuid})
+
+    return details_dict
+
 def lambda_handler(event, context):
     "Main lambda handler"
     record = event['Records'][0]
@@ -36,15 +52,12 @@ def lambda_handler(event, context):
     for file in files_list:
         s3.upload_file(unzipped_dir + file, bucket, unzipped_s3_prefix + file)
 
-    # Retrieve app_uuid, selfie_key, license_key, and details_file and save them as variables for later use
+    # Retrieve app_uuid from .zip file
     app_uuid = os.path.basename(key).replace(".zip", "")
     selfie_key = f"{unzipped_s3_prefix}{app_uuid}_selfie.png"
     license_key = f"{unzipped_s3_prefix}{app_uuid}_license.png"
     details_file = f"{unzipped_dir}{app_uuid}_details.csv"
 
-    # Add print to verify your solution by checking CloudWatch Logs
-    # You can remove these print statements once you verified your solution
-    print(f"app_uuid = {app_uuid}")
-    print(f"selfie_key = {selfie_key}")
-    print(f"license_key = {license_key}")
-    print(f"details_file = {details_file}")
+    # Save CSV to dynamo
+    
+    details_dict = parse_csv_ddb(app_uuid, details_file)
